@@ -2,9 +2,11 @@
 
 import { useState } from "react"
 import { ethers } from "ethers"
+import { useWeb3 } from "../contexts/Web3Provider"
 import QRCode from "qrcode"
 
-export default function TransferButtons({ account, signer, addToast }) {
+export default function TransferButtons({ addToast }) {
+  const { account, getSigner, isConnected } = useWeb3()
   const [showSendModal, setShowSendModal] = useState(false)
   const [showReceiveModal, setShowReceiveModal] = useState(false)
   const [recipient, setRecipient] = useState("")
@@ -13,8 +15,8 @@ export default function TransferButtons({ account, signer, addToast }) {
   const [qrCodeUrl, setQrCodeUrl] = useState("")
 
   const handleSend = async () => {
-    if (!recipient || !amount || !signer) {
-      addToast("Please fill all fields and connect wallet", "error", 3000)
+    if (!recipient || !amount) {
+      addToast("Please fill all fields", "error", 3000)
       return
     }
 
@@ -27,10 +29,10 @@ export default function TransferButtons({ account, signer, addToast }) {
         throw new Error("Invalid recipient address")
       }
 
-      // Convert amount to wei
+      // Get signer and send transaction
+      const signer = await getSigner()
       const value = ethers.parseEther(amount)
 
-      // Send transaction
       const tx = await signer.sendTransaction({
         to: recipient,
         value: value,
@@ -108,7 +110,7 @@ export default function TransferButtons({ account, signer, addToast }) {
       <div className="flex gap-4 justify-center mb-6">
         <button
           onClick={() => setShowSendModal(true)}
-          disabled={!account}
+          disabled={!isConnected}
           className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-gray-600 disabled:to-gray-600 text-white px-6 py-3 rounded-lg font-medium transition-all transform hover:scale-105 disabled:hover:scale-100 shadow-lg flex items-center gap-2"
         >
           <span>📤</span>
@@ -116,7 +118,7 @@ export default function TransferButtons({ account, signer, addToast }) {
         </button>
         <button
           onClick={handleReceive}
-          disabled={!account}
+          disabled={!isConnected}
           className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 disabled:from-gray-600 disabled:to-gray-600 text-white px-6 py-3 rounded-lg font-medium transition-all transform hover:scale-105 disabled:hover:scale-100 shadow-lg flex items-center gap-2"
         >
           <span>📥</span>

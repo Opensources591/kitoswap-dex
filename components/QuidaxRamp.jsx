@@ -147,38 +147,25 @@ export default function QuidaxRamp({ addToast }) {
         {/* Last Order Display */}
         {lastOrder && (
           <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-            <h4 className="text-white font-medium mb-2">Last Order</h4>
-            <div className="space-y-1 text-sm">
+            <h4 className="text-white font-medium mb-2">Order Details</h4>
+            <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-white/70">Order ID:</span>
                 <span className="text-white font-mono">{lastOrder.id}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-white/70">Market:</span>
-                <span className="text-white">{lastOrder.market.toUpperCase()}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-white/70">Side:</span>
-                <span className={`font-medium ${lastOrder.side === "buy" ? "text-green-400" : "text-red-400"}`}>
-                  {lastOrder.side.toUpperCase()}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-white/70">Amount:</span>
-                <span className="text-white">{lastOrder.volume}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-white/70">Price:</span>
-                <span className="text-white">{formatCurrency(lastOrder.price)}</span>
+                <span className="text-white/70">Status:</span>
+                <span className="text-yellow-400">{lastOrder.status.toUpperCase()}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-white/70">Total:</span>
                 <span className="text-white font-bold">{formatCurrency(lastOrder.total)}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-white/70">Status:</span>
-                <span className="text-yellow-400">{lastOrder.status.toUpperCase()}</span>
-              </div>
+              {lastOrder.instructions && (
+                <div className="mt-3 p-3 bg-blue-500/20 border border-blue-500/30 rounded-lg">
+                  <p className="text-blue-300 text-sm">{lastOrder.instructions}</p>
+                </div>
+              )}
             </div>
           </div>
         )}

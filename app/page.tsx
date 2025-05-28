@@ -1,144 +1,98 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { getNetworkConfig } from "../utils/networks"
-import { useToast, ToastContainer } from "../components/Toast"
+import { useWeb3 } from "../contexts/Web3Provider"
+import AuthButtons from "../components/AuthButtons"
+import TransferButtons from "../components/TransferButtons"
+import QuidaxRamp from "../components/QuidaxRamp"
+import QuidaxMarketData from "../components/QuidaxMarketData"
+import PriceComparison from "../components/PriceComparison"
+import AddTokenButtons from "../components/AddTokenButtons"
+import tokensConfig from "../src/config/tokens.json"
+
+// Toast system
+function useToast() {
+  const [toasts, setToasts] = useState([])
+
+  const addToast = (message, type = "info", duration = 5000) => {
+    const id = Date.now()
+    const toast = { id, message, type, duration }
+    setToasts((prev) => [...prev, toast])
+
+    if (duration > 0) {
+      setTimeout(() => {
+        removeToast(id)
+      }, duration)
+    }
+  }
+
+  const removeToast = (id) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id))
+  }
+
+  return { toasts, addToast, removeToast }
+}
+
+function ToastContainer({ toasts, removeToast }) {
+  return (
+    <div className="fixed top-4 right-4 z-50 space-y-2">
+      {toasts.map((toast) => (
+        <Toast key={toast.id} toast={toast} onRemove={removeToast} />
+      ))}
+    </div>
+  )
+}
+
+function Toast({ toast, onRemove }) {
+  const { id, message, type } = toast
+
+  const getToastStyles = () => {
+    switch (type) {
+      case "success":
+        return "bg-green-500/90 border-green-400 text-green-100"
+      case "error":
+        return "bg-red-500/90 border-red-400 text-red-100"
+      case "warning":
+        return "bg-yellow-500/90 border-yellow-400 text-yellow-100"
+      default:
+        return "bg-blue-500/90 border-blue-400 text-blue-100"
+    }
+  }
+
+  return (
+    <div className={`${getToastStyles()} border backdrop-blur-md rounded-lg p-4 max-w-sm shadow-lg`}>
+      <div className="flex justify-between items-start">
+        <p className="text-sm font-medium">{message}</p>
+        <button onClick={() => onRemove(id)} className="ml-2 text-white/70 hover:text-white">
+          ✕
+        </button>
+      </div>
+    </div>
+  )
+}
 
 export default function KitoSwapDEX() {
-  // Toast system
+  const { isConnected, account, getBalance } = useWeb3()
   const { toasts, addToast, removeToast } = useToast()
-
-  // Network state
-  const [selectedNetwork, setSelectedNetwork] = useState("BSC")
-  const [networkConfig, setNetworkConfig] = useState(getNetworkConfig("BSC"))
-
-  // Mock wallet state for preview
-  const [account, setAccount] = useState("")
-  const [isConnected, setIsConnected] = useState(false)
-
-  // Mock network info state
-  const [connectionStatus, setConnectionStatus] = useState({
-    rpcUrl: "",
-    chainId: 0,
-    latestBlock: 0,
-    allPairsLength: 0,
-    isConnected: false,
-  })
-
-  // Swap state
-  const [tokenIn, setTokenIn] = useState("")
-  const [tokenOut, setTokenOut] = useState("")
+  const [balance, setBalance] = useState("0")
+  const [selectedTokenIn, setSelectedTokenIn] = useState("")
+  const [selectedTokenOut, setSelectedTokenOut] = useState("")
   const [amountIn, setAmountIn] = useState("")
-  const [amountOut, setAmountOut] = useState("")
-  const [slippage, setSlippage] = useState(1)
 
-  // UI state
-  const [isApproving, setIsApproving] = useState(false)
-  const [isSwapping, setIsSwapping] = useState(false)
-  const [isConnecting, setIsConnecting] = useState(false)
-  const [balance, setBalance] = useState("12.5432")
+  const tokens = tokensConfig["56"]?.tokens || []
 
-  // Initialize network when selection changes
   useEffect(() => {
-    const config = getNetworkConfig(selectedNetwork)
-    setNetworkConfig(config)
-
-    // Set default tokens
-    const tokens = Object.keys(config.tokens)
     if (tokens.length >= 2) {
-      setTokenIn(config.tokens[tokens[0]])
-      setTokenOut(config.tokens[tokens[1]])
+      setSelectedTokenIn(tokens[0].address)
+      setSelectedTokenOut(tokens[1].address)
     }
+  }, [tokens])
 
-    // Mock connection status
-    setConnectionStatus({
-      rpcUrl: config.rpcUrl || "https://bsc-dataseed1.binance.org/",
-      chainId: config.chainId,
-      latestBlock: selectedNetwork === "BSC" ? 50376798 : 1234567,
-      allPairsLength: selectedNetwork === "BSC" ? 1843617 : 45231,
-      isConnected: true,
-    })
-
-    addToast(`Switched to ${config.name}`, "success", 3000)
-  }, [selectedNetwork])
-
-  // Mock price calculation
   useEffect(() => {
-    if (amountIn && Number.parseFloat(amountIn) > 0) {
-      const mockRate = selectedNetwork === "BSC" ? 0.95 : 1.02
-      const calculated = (Number.parseFloat(amountIn) * mockRate).toFixed(6)
-      setAmountOut(calculated)
-    } else {
-      setAmountOut("")
+    if (isConnected && account) {
+      getBalance().then(setBalance)
     }
-  }, [amountIn, tokenIn, tokenOut, selectedNetwork])
-
-  const connectWallet = async () => {
-    setIsConnecting(true)
-    addToast("Connecting wallet...", "info", 2000)
-
-    setTimeout(() => {
-      setAccount("0xa36f...4f81")
-      setIsConnected(true)
-      setIsConnecting(false)
-      addToast("Wallet connected successfully!", "success", 3000)
-    }, 2000)
-  }
-
-  const approveToken = async () => {
-    setIsApproving(true)
-    addToast("Approving token...", "info", 0)
-
-    setTimeout(() => {
-      setIsApproving(false)
-      addToast("Token approved successfully!", "success", 3000)
-    }, 3000)
-  }
-
-  const executeSwap = async () => {
-    setIsSwapping(true)
-    addToast("Executing swap...", "info", 0)
-
-    setTimeout(() => {
-      setIsSwapping(false)
-      addToast(
-        <div>
-          Swap completed!
-          <a href="#" className="underline ml-1">
-            View on Explorer
-          </a>
-        </div>,
-        "success",
-        5000,
-      )
-      setAmountIn("")
-      setAmountOut("")
-    }, 4000)
-  }
-
-  const runSmokeTest = () => {
-    addToast("Running smoke test...", "info", 2000)
-
-    console.log("=== KITOSWAP DEX SMOKE TEST ===")
-    console.log("Selected Network:", selectedNetwork)
-    console.log("Network Config:", networkConfig)
-    console.log("Connection Status:", connectionStatus)
-    console.log("Account:", account)
-    console.log("=== END SMOKE TEST ===")
-
-    setTimeout(() => {
-      addToast("Smoke test completed! Check console for details.", "success", 3000)
-    }, 2000)
-  }
-
-  const getTokenSymbol = (tokenAddress) => {
-    const tokenEntries = Object.entries(networkConfig.tokens)
-    const found = tokenEntries.find(([, address]) => address === tokenAddress)
-    return found ? found[0] : "Unknown"
-  }
-
-  const needsApproval = !isConnected || (tokenIn !== networkConfig.tokens.WBNB && tokenIn !== networkConfig.tokens.WMTL)
-  const canSwap = isConnected && amountIn && amountOut && !needsApproval
+  }, [isConnected, account, getBalance])
 
   return (
     <>
@@ -153,230 +107,126 @@ export default function KitoSwapDEX() {
               <span className="bg-[#4B6CB7] text-white px-3 py-1 rounded-full text-sm font-medium">Production</span>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-center gap-4">
-              {/* Network Selector */}
-              <select
-                value={selectedNetwork}
-                onChange={(e) => setSelectedNetwork(e.target.value)}
-                className="bg-[#182848] text-white border-2 border-[#4B6CB7] rounded-lg px-4 py-2 font-medium focus:outline-none focus:ring-2 focus:ring-[#4B6CB7] focus:border-transparent transition-all"
-              >
-                <option value="BSC">BSC Mainnet</option>
-                <option value="METAL">Metal Build</option>
-              </select>
-
-              {/* Wallet Connection */}
-              {!isConnected ? (
-                <button
-                  onClick={connectWallet}
-                  disabled={isConnecting}
-                  className="bg-[#4B6CB7] hover:bg-blue-700 disabled:bg-gray-600 text-white px-6 py-2 rounded-lg font-medium transition-all transform hover:scale-105"
-                >
-                  {isConnecting ? "Connecting..." : "Connect MetaMask"}
-                </button>
-              ) : (
-                <div className="text-white text-sm text-center">
-                  <div className="font-medium">{account}</div>
-                  <div className="text-xs text-green-400">{networkConfig.name}</div>
-                </div>
-              )}
-
-              {/* Smoke Test Button */}
-              <button
-                onClick={runSmokeTest}
-                className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg font-medium transition-all text-sm"
-              >
-                🧪 Test
-              </button>
-            </div>
+            <AuthButtons addToast={addToast} />
           </div>
         </header>
 
-        {/* Connection Status Panel */}
+        {/* Transfer Buttons */}
         <div className="container mx-auto px-4 mb-8">
-          <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20">
-            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-              <div
-                className={`w-3 h-3 rounded-full ${connectionStatus.isConnected ? "bg-green-400" : "bg-red-400"}`}
-              ></div>
-              Connection Status - {networkConfig.name}
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-white">
-              <div>
-                <div className="text-sm text-white/70">RPC URL</div>
-                <div className="font-mono text-xs break-all">{connectionStatus.rpcUrl}</div>
-              </div>
-              <div>
-                <div className="text-sm text-white/70">Chain ID</div>
-                <div className="font-bold text-[#4B6CB7]">{connectionStatus.chainId}</div>
-              </div>
-              <div>
-                <div className="text-sm text-white/70">Latest Block</div>
-                <div className="font-bold text-green-400">{connectionStatus.latestBlock.toLocaleString()}</div>
-              </div>
-              <div>
-                <div className="text-sm text-white/70">Trading Pairs</div>
-                <div className="font-bold text-purple-400">{connectionStatus.allPairsLength.toLocaleString()}</div>
-              </div>
-            </div>
-          </div>
+          <TransferButtons addToast={addToast} />
         </div>
 
-        {/* Main Swap Interface */}
-        <div className="container mx-auto px-4">
-          <div className="max-w-lg mx-auto">
-            <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20">
-              <h2 className="text-xl font-bold text-white mb-6 text-center">Swap Tokens</h2>
+        {/* Main Content Grid */}
+        <div className="container mx-auto px-4 grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          {/* Swap Interface */}
+          <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 shadow-lg">
+            <h2 className="text-xl font-bold text-white mb-6 text-center">Swap Tokens</h2>
 
-              <div className="space-y-4">
-                {/* Token Input */}
-                <div>
-                  <label className="block text-white text-sm font-medium mb-2">From</label>
-                  <div className="flex gap-2 mb-2">
-                    <select
-                      value={tokenIn}
-                      onChange={(e) => setTokenIn(e.target.value)}
-                      className="bg-white/20 text-white border border-white/30 rounded-lg px-3 py-2 flex-1 focus:outline-none focus:ring-2 focus:ring-[#4B6CB7]"
-                    >
-                      {Object.entries(networkConfig.tokens).map(([symbol, address]) => (
-                        <option key={address} value={address}>
-                          {symbol}
-                        </option>
-                      ))}
-                    </select>
-                    {needsApproval && amountIn && (
-                      <button
-                        onClick={approveToken}
-                        disabled={!isConnected || isApproving}
-                        className="bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap"
-                      >
-                        {isApproving ? "Approving..." : "Approve"}
-                      </button>
-                    )}
-                  </div>
-                  <input
-                    type="number"
-                    value={amountIn}
-                    onChange={(e) => setAmountIn(e.target.value)}
-                    placeholder="0.0"
-                    className="w-full bg-white/20 text-white border border-white/30 rounded-lg px-3 py-2 placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-[#4B6CB7]"
-                  />
-                  <div className="text-white/70 text-sm mt-1 flex justify-between">
-                    <span>
-                      Balance: {balance} {getTokenSymbol(tokenIn)}
-                    </span>
-                    <button
-                      onClick={() => setAmountIn(balance)}
-                      className="text-[#4B6CB7] hover:text-blue-300 text-xs underline"
-                    >
-                      MAX
-                    </button>
-                  </div>
-                </div>
-
-                {/* Swap Direction Button */}
-                <div className="flex justify-center">
-                  <button
-                    onClick={() => {
-                      const temp = tokenIn
-                      setTokenIn(tokenOut)
-                      setTokenOut(temp)
-                      setAmountIn("")
-                      setAmountOut("")
-                    }}
-                    className="bg-white/20 hover:bg-white/30 text-white p-3 rounded-full transition-all transform hover:rotate-180"
-                  >
-                    ↕️
-                  </button>
-                </div>
-
-                {/* Token Output */}
-                <div>
-                  <label className="block text-white text-sm font-medium mb-2">To</label>
+            <div className="space-y-4">
+              {/* Token Input */}
+              <div>
+                <label className="block text-white text-sm font-medium mb-2">From</label>
+                <div className="flex gap-2 mb-2">
                   <select
-                    value={tokenOut}
-                    onChange={(e) => setTokenOut(e.target.value)}
-                    className="w-full bg-white/20 text-white border border-white/30 rounded-lg px-3 py-2 mb-2 focus:outline-none focus:ring-2 focus:ring-[#4B6CB7]"
+                    value={selectedTokenIn}
+                    onChange={(e) => setSelectedTokenIn(e.target.value)}
+                    className="bg-white/20 text-white border border-white/30 rounded-lg px-3 py-2 flex-1 focus:outline-none focus:ring-2 focus:ring-[#4B6CB7]"
                   >
-                    {Object.entries(networkConfig.tokens).map(([symbol, address]) => (
-                      <option key={address} value={address}>
-                        {symbol}
+                    {tokens.map((token) => (
+                      <option key={token.address} value={token.address}>
+                        {token.symbol} - {token.name}
                       </option>
                     ))}
                   </select>
-                  <input
-                    type="number"
-                    value={amountOut}
-                    readOnly
-                    placeholder="0.0"
-                    className="w-full bg-white/10 text-white border border-white/30 rounded-lg px-3 py-2 placeholder-white/50"
-                  />
-                  <div className="text-white/70 text-sm mt-1">You will receive: {getTokenSymbol(tokenOut)}</div>
+                  {tokens.find((t) => t.address === selectedTokenIn) && (
+                    <AddTokenButtons token={tokens.find((t) => t.address === selectedTokenIn)} addToast={addToast} />
+                  )}
                 </div>
-
-                {/* Slippage Settings */}
-                <div>
-                  <label className="block text-white text-sm font-medium mb-2">Slippage Tolerance: {slippage}%</label>
-                  <div className="flex gap-2 mb-2">
-                    {[0.5, 1, 2, 5].map((value) => (
-                      <button
-                        key={value}
-                        onClick={() => setSlippage(value)}
-                        className={`px-3 py-1 rounded text-sm font-medium transition-all ${
-                          slippage === value ? "bg-[#4B6CB7] text-white" : "bg-white/20 text-white/70 hover:bg-white/30"
-                        }`}
-                      >
-                        {value}%
-                      </button>
-                    ))}
-                  </div>
-                  <input
-                    type="range"
-                    min="0.1"
-                    max="10"
-                    step="0.1"
-                    value={slippage}
-                    onChange={(e) => setSlippage(Number.parseFloat(e.target.value))}
-                    className="w-full accent-[#4B6CB7]"
-                  />
-                </div>
-
-                {/* Swap Button */}
-                <button
-                  onClick={executeSwap}
-                  disabled={!canSwap || isSwapping}
-                  className="w-full bg-gradient-to-r from-[#4B6CB7] to-[#182848] hover:from-blue-700 hover:to-[#1a2a4a] disabled:from-gray-600 disabled:to-gray-600 text-white py-4 rounded-lg font-bold text-lg transition-all transform hover:scale-105 disabled:hover:scale-100"
-                >
-                  {!isConnected
-                    ? "Connect Wallet"
-                    : needsApproval && amountIn
-                      ? "Approve Token First"
-                      : isSwapping
-                        ? "Swapping..."
-                        : "Swap"}
-                </button>
-
-                {/* Price Impact Info */}
-                {amountOut && Number.parseFloat(amountOut) > 0 && (
-                  <div className="text-center text-white/70 text-sm">
-                    <div>Price Impact: ~{slippage}%</div>
-                    <div>
-                      Minimum Received: {((Number.parseFloat(amountOut) * (100 - slippage)) / 100).toFixed(6)}{" "}
-                      {getTokenSymbol(tokenOut)}
-                    </div>
-                  </div>
-                )}
+                <input
+                  type="number"
+                  value={amountIn}
+                  onChange={(e) => setAmountIn(e.target.value)}
+                  placeholder="0.0"
+                  className="w-full bg-white/20 text-white border border-white/30 rounded-lg px-3 py-2 placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-[#4B6CB7]"
+                />
+                <div className="text-white/70 text-sm mt-1">Balance: {balance} BNB</div>
               </div>
+
+              {/* Swap Direction Button */}
+              <div className="flex justify-center">
+                <button
+                  onClick={() => {
+                    const temp = selectedTokenIn
+                    setSelectedTokenIn(selectedTokenOut)
+                    setSelectedTokenOut(temp)
+                  }}
+                  className="bg-white/20 hover:bg-white/30 text-white p-3 rounded-full transition-all transform hover:rotate-180"
+                >
+                  ↕️
+                </button>
+              </div>
+
+              {/* Token Output */}
+              <div>
+                <label className="block text-white text-sm font-medium mb-2">To</label>
+                <div className="flex gap-2 mb-2">
+                  <select
+                    value={selectedTokenOut}
+                    onChange={(e) => setSelectedTokenOut(e.target.value)}
+                    className="bg-white/20 text-white border border-white/30 rounded-lg px-3 py-2 flex-1 focus:outline-none focus:ring-2 focus:ring-[#4B6CB7]"
+                  >
+                    {tokens.map((token) => (
+                      <option key={token.address} value={token.address}>
+                        {token.symbol} - {token.name}
+                      </option>
+                    ))}
+                  </select>
+                  {tokens.find((t) => t.address === selectedTokenOut) && (
+                    <AddTokenButtons token={tokens.find((t) => t.address === selectedTokenOut)} addToast={addToast} />
+                  )}
+                </div>
+                <input
+                  type="number"
+                  placeholder="0.0"
+                  readOnly
+                  className="w-full bg-white/10 text-white border border-white/30 rounded-lg px-3 py-2 placeholder-white/50"
+                />
+              </div>
+
+              {/* Price Comparison */}
+              <PriceComparison
+                tokenIn={selectedTokenIn}
+                tokenOut={selectedTokenOut}
+                amountIn={amountIn}
+                addToast={addToast}
+              />
+
+              {/* Swap Button */}
+              <button
+                disabled={!isConnected || !amountIn}
+                className="w-full bg-gradient-to-r from-[#4B6CB7] to-[#182848] hover:from-blue-700 hover:to-[#1a2a4a] disabled:from-gray-600 disabled:to-gray-600 text-white py-4 rounded-lg font-bold text-lg transition-all transform hover:scale-105 disabled:hover:scale-100 shadow-lg"
+              >
+                {!isConnected ? "Connect Wallet" : "Swap"}
+              </button>
             </div>
           </div>
+
+          {/* Quidax Ramp */}
+          <QuidaxRamp addToast={addToast} />
+        </div>
+
+        {/* Market Data */}
+        <div className="container mx-auto px-4 mb-8">
+          <QuidaxMarketData addToast={addToast} />
         </div>
 
         {/* Footer */}
         <footer className="text-center text-white/70 text-sm mt-8 pb-8">
-          <p>© 2025 KitoConnect. Production-ready multi-chain DEX.</p>
+          <p>© 2025 KitoConnect. Production-ready DEX on BNB Smart Chain.</p>
           <div className="flex justify-center items-center gap-4 mt-2 flex-wrap">
-            <span>Powered by {networkConfig.name}</span>
+            <span>Powered by Web3Auth</span>
             <span>•</span>
-            <span>Secured by MetaMask</span>
+            <span>Secured by BNB Chain</span>
             <span>•</span>
             <span>Built with ❤️</span>
           </div>

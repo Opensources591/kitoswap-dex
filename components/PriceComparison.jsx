@@ -1,21 +1,26 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { getTokenPrice } from "../lib/quidaxClient"
+import { quidaxClient } from "../lib/quidaxClient"
+import { useSwapRate } from "../hooks/useSwapRate"
 
-export default function PriceComparison({ tokenIn, tokenOut, networkConfig, dexPrice, addToast }) {
+export default function PriceComparison({ tokenIn, tokenOut, amountIn, addToast }) {
   const [quidaxPrices, setQuidaxPrices] = useState({})
   const [isLoading, setIsLoading] = useState(false)
-  const [priceComparison, setPriceComparison] = useState(null)
+  const { swapRate, isLoading: swapLoading } = useSwapRate(tokenIn, tokenOut, amountIn)
 
-  // Get token symbol from address
+  // Mock token symbol mapping
   const getTokenSymbol = (tokenAddress) => {
-    const tokenEntries = Object.entries(networkConfig.tokens)
-    const found = tokenEntries.find(([, address]) => address === tokenAddress)
-    return found ? found[0] : "Unknown"
+    const tokenMap = {
+      "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c": "WBNB",
+      "0x55d398326f99059fF775485246999027B3197955": "USDT",
+      "0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56": "BUSD",
+      "0x553a0d5074b5f57b90594c9c5db3289a17ee8b9c": "KBC",
+      "0x386c66a0a3d452b7296c0763296fc7d9124e62f8": "KBB",
+    }
+    return tokenMap[tokenAddress] || "Unknown"
   }
 
-  // Fetch Quidax prices for comparison
   useEffect(() => {
     if (!tokenIn || !tokenOut) return
 
@@ -25,44 +30,21 @@ export default function PriceComparison({ tokenIn, tokenOut, networkConfig, dexP
         const tokenInSymbol = getTokenSymbol(tokenIn).toLowerCase()
         const tokenOutSymbol = getTokenSymbol(tokenOut).toLowerCase()
 
-        // Only fetch if tokens are supported by Quidax
-        const supportedTokens = ["btc", "eth", "usdt", "bnb", "ada", "dot"]
-
-        const pricePromises = []
-
-        if (supportedTokens.includes(tokenInSymbol)) {
-          pricePromises.push(getTokenPrice(tokenInSymbol).then((price) => ({ token: tokenInSymbol, ...price })))
-        }
-
-        if (supportedTokens.includes(tokenOutSymbol)) {
-          pricePromises.push(getTokenPrice(tokenOutSymbol).then((price) => ({ token: tokenOutSymbol, ...price })))
-        }
-
-        const prices = await Promise.allSettled(pricePromises)
+        const supportedTokens = ["btc", "eth", "usdt", "bnb"]
         const newPrices = {}
 
-        prices.forEach((result) => {
-          if (result.status === "fulfilled") {
-            newPrices[result.value.token] = result.value
+        for (const symbol of [tokenInSymbol, tokenOutSymbol]) {
+          if (supportedTokens.includes(symbol)) {
+            try {
+              const priceData = await quidaxClient.getTokenPrice(symbol)
+              newPrices[symbol] = priceData
+            } catch (error) {
+              console.log(`Price not available for ${symbol}`)
+            }
           }
-        })
+        }
 
         setQuidaxPrices(newPrices)
-
-        // Calculate price comparison if we have both prices
-        if (dexPrice && newPrices[tokenInSymbol] && newPrices[tokenOutSymbol]) {
-          const quidaxRate =
-            Number.parseFloat(newPrices[tokenOutSymbol].price) / Number.parseFloat(newPrices[tokenInSymbol].price)
-          const dexRate = Number.parseFloat(dexPrice)
-          const difference = ((dexRate - quidaxRate) / quidaxRate) * 100
-
-          setPriceComparison({
-            quidaxRate,
-            dexRate,
-            difference,
-            arbitrageOpportunity: Math.abs(difference) > 1, // 1% threshold
-          })
-        }
       } catch (error) {
         console.error("Error fetching Quidax prices:", error)
       } finally {
@@ -71,7 +53,7 @@ export default function PriceComparison({ tokenIn, tokenOut, networkConfig, dexP
     }
 
     fetchPrices()
-  }, [tokenIn, tokenOut, networkConfig, dexPrice])
+  }, [tokenIn, tokenOut])
 
   const formatPrice = (price) => {
     const numPrice = Number.parseFloat(price)
@@ -81,11 +63,6 @@ export default function PriceComparison({ tokenIn, tokenOut, networkConfig, dexP
       return `₦${(numPrice / 1000).toFixed(2)}K`
     }
     return `₦${numPrice.toFixed(2)}`
-  }
-
-  const formatPercentage = (value) => {
-    const sign = value >= 0 ? "+" : ""
-    return `${sign}${value.toFixed(2)}%`
   }
 
   const tokenInSymbol = getTokenSymbol(tokenIn).toLowerCase()
@@ -99,12 +76,14 @@ export default function PriceComparison({ tokenIn, tokenOut, networkConfig, dexP
   return (
     <div className="bg-white/5 backdrop-blur-sm rounded-lg p-4 border border-white/10">
       <div className="flex items-center justify-between mb-3">
-        <h4 className="text-white font-medium text-sm">Quidax Price Reference</h4>
-        {isLoading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>}
+        <h4 className="text-white font-medium text-sm">Price Comparison</h4>
+        {(isLoading || swapLoading) && (
+          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+        )}
       </div>
 
       <div className="space-y-3">
-        {/* Individual Token Prices */}
+        {/* Quidax Prices */}
         <div className="space-y-2">
           {quidaxPrices[tokenInSymbol] && (
             <div className="flex justify-between items-center">
@@ -139,42 +118,12 @@ export default function PriceComparison({ tokenIn, tokenOut, networkConfig, dexP
           )}
         </div>
 
-        {/* Price Comparison */}
-        {priceComparison && (
+        {/* DEX Rate */}
+        {swapRate && (
           <div className="pt-3 border-t border-white/10">
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-white/70 text-sm">DEX Rate</span>
-                <span className="text-white text-sm">{priceComparison.dexRate.toFixed(6)}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-white/70 text-sm">Quidax Rate</span>
-                <span className="text-white text-sm">{priceComparison.quidaxRate.toFixed(6)}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-white/70 text-sm">Difference</span>
-                <span
-                  className={`text-sm font-medium ${
-                    priceComparison.difference >= 0 ? "text-green-400" : "text-red-400"
-                  }`}
-                >
-                  {formatPercentage(priceComparison.difference)}
-                </span>
-              </div>
-
-              {priceComparison.arbitrageOpportunity && (
-                <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-2 mt-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-yellow-400">⚡</span>
-                    <span className="text-yellow-400 text-xs font-medium">Arbitrage Opportunity Detected!</span>
-                  </div>
-                  <div className="text-yellow-300 text-xs mt-1">
-                    {priceComparison.difference > 0
-                      ? "DEX price is higher - consider selling on DEX"
-                      : "Quidax price is higher - consider buying on DEX"}
-                  </div>
-                </div>
-              )}
+            <div className="flex justify-between items-center">
+              <span className="text-white/70 text-sm">DEX Rate</span>
+              <span className="text-white text-sm">{swapRate.toFixed(6)}</span>
             </div>
           </div>
         )}
