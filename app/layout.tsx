@@ -1,5 +1,4 @@
 import "./globals.css"
-import Web3Provider from "../contexts/Web3Provider"
 
 export const metadata = {
   title: "KitoSwap DEX",
@@ -10,9 +9,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body>
-        <Web3Provider>{children}</Web3Provider>
-      </body>
+      <body>{children}</body>
     </html>
   )
 }

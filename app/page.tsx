@@ -74,12 +74,15 @@ function useWeb3() {
     connect: () => {
       setIsConnected(true)
       setAccount("0xa36f...4f81")
+      return Promise.resolve({ provider: {}, account: "0xa36f...4f81" })
     },
     disconnect: () => {
       setIsConnected(false)
       setAccount("")
+      return Promise.resolve()
     },
     getBalance: () => Promise.resolve("12.5432"),
+    getSigner: () => Promise.resolve({}),
   }
 }
 
@@ -93,7 +96,7 @@ function AuthButtons({ addToast }) {
       setIsConnecting(true)
       addToast("Connecting wallet...", "info", 2000)
       await new Promise((resolve) => setTimeout(resolve, 1500))
-      connect()
+      await connect()
       addToast("Wallet connected successfully!", "success", 3000)
     } catch (error) {
       addToast(`Connection failed: ${error.message}`, "error", 5000)
@@ -104,7 +107,7 @@ function AuthButtons({ addToast }) {
 
   const handleDisconnect = async () => {
     try {
-      disconnect()
+      await disconnect()
       addToast("Wallet disconnected", "info", 2000)
     } catch (error) {
       addToast(`Disconnect failed: ${error.message}`, "error", 3000)
@@ -160,7 +163,7 @@ function AddTokenButtons({ token, addToast }) {
 
   const addTokenToMetaMask = async () => {
     // Check if MetaMask is installed
-    if (!window.ethereum) {
+    if (typeof window === "undefined" || !window.ethereum) {
       addToast("MetaMask not detected. Please install MetaMask extension.", "error", 5000)
       return
     }
@@ -240,18 +243,49 @@ function MetaMaskTestPanel({ addToast }) {
   const kbcToken = tokens.find((t) => t.symbol === "KBC")
   const kbbToken = tokens.find((t) => t.symbol === "KBB")
 
+  const checkMetaMaskStatus = () => {
+    if (typeof window !== "undefined" && window.ethereum) {
+      setMetaMaskStatus((prev) => ({
+        ...prev,
+        installed: true,
+      }))
+    }
+  }
+
+  useEffect(() => {
+    checkMetaMaskStatus()
+  }, [])
+
   const connectMetaMask = async () => {
-    addToast("Connecting to MetaMask...", "info", 2000)
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setMetaMaskStatus((prev) => ({ ...prev, connected: true, account: "0xa36f...4f81" }))
-    addToast("MetaMask connected successfully!", "success", 3000)
+    if (typeof window === "undefined" || !window.ethereum) {
+      addToast("MetaMask not installed", "error", 3000)
+      return
+    }
+
+    try {
+      addToast("Connecting to MetaMask...", "info", 2000)
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      setMetaMaskStatus((prev) => ({ ...prev, connected: true, account: "0xa36f...4f81" }))
+      addToast("MetaMask connected successfully!", "success", 3000)
+    } catch (error) {
+      addToast("Failed to connect to MetaMask", "error", 3000)
+    }
   }
 
   const switchToBSC = async () => {
-    addToast("Switching to BSC Mainnet...", "info", 2000)
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setMetaMaskStatus((prev) => ({ ...prev, chainId: "0x38" }))
-    addToast("Switched to BSC Mainnet", "success", 3000)
+    if (typeof window === "undefined" || !window.ethereum) {
+      addToast("MetaMask not installed", "error", 3000)
+      return
+    }
+
+    try {
+      addToast("Switching to BSC Mainnet...", "info", 2000)
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      setMetaMaskStatus((prev) => ({ ...prev, chainId: "0x38" }))
+      addToast("Switched to BSC Mainnet", "success", 3000)
+    } catch (error) {
+      addToast("Failed to switch network", "error", 3000)
+    }
   }
 
   const getChainName = (chainId) => {
@@ -556,6 +590,157 @@ function TransferButtons({ addToast }) {
   )
 }
 
+// Quidax Market Data Component
+function QuidaxMarketData({ addToast }) {
+  const [marketData, setMarketData] = useState([
+    {
+      id: "btcngn",
+      name: "BTC/NGN",
+      base_unit: "btc",
+      quote_unit: "ngn",
+      ticker: {
+        last: "45000000.0",
+        high: "46000000.0",
+        low: "44000000.0",
+        change: "+2.3",
+        volume: "12.45",
+      },
+    },
+    {
+      id: "ethngn",
+      name: "ETH/NGN",
+      base_unit: "eth",
+      quote_unit: "ngn",
+      ticker: {
+        last: "2800000.0",
+        high: "2850000.0",
+        low: "2750000.0",
+        change: "+1.8",
+        volume: "156.78",
+      },
+    },
+    {
+      id: "usdtngn",
+      name: "USDT/NGN",
+      base_unit: "usdt",
+      quote_unit: "ngn",
+      ticker: {
+        last: "1580.0",
+        high: "1585.0",
+        low: "1575.0",
+        change: "+0.3",
+        volume: "45678.90",
+      },
+    },
+  ])
+  const [selectedMarket, setSelectedMarket] = useState("btcngn")
+  const [isLoading, setIsLoading] = useState(false)
+
+  const fetchMarketData = async () => {
+    setIsLoading(true)
+    try {
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      addToast("Market data updated", "success", 2000)
+    } catch (error) {
+      addToast(`Failed to fetch market data: ${error.message}`, "error", 5000)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const formatPrice = (price) => {
+    const numPrice = Number.parseFloat(price)
+    if (numPrice >= 1000000) {
+      return `₦${(numPrice / 1000000).toFixed(2)}M`
+    } else if (numPrice >= 1000) {
+      return `₦${(numPrice / 1000).toFixed(2)}K`
+    }
+    return `₦${numPrice.toFixed(2)}`
+  }
+
+  const getChangeColor = (change) => {
+    const numChange = Number.parseFloat(change)
+    if (numChange > 0) return "text-green-400"
+    if (numChange < 0) return "text-red-400"
+    return "text-white/70"
+  }
+
+  const getAssetIcon = (symbol) => {
+    const icons = {
+      btc: "₿",
+      eth: "Ξ",
+      usdt: "💵",
+      ada: "🔷",
+      dot: "⚫",
+    }
+    return icons[symbol] || "💰"
+  }
+
+  return (
+    <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 shadow-lg">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-green-400"></div>
+          Quidax Market Data
+        </h3>
+        <button
+          onClick={fetchMarketData}
+          className="text-white/70 hover:text-white transition-colors text-sm"
+          title="Refresh market data"
+        >
+          🔄
+        </button>
+      </div>
+
+      {marketData.length > 0 ? (
+        <div className="space-y-3">
+          {marketData.map((market) => (
+            <div
+              key={market.id}
+              className={`flex justify-between items-center p-4 rounded-lg border transition-all cursor-pointer ${
+                selectedMarket === market.id
+                  ? "bg-[#4B6CB7]/20 border-[#4B6CB7]/50"
+                  : "bg-white/5 border-white/10 hover:bg-white/10"
+              }`}
+              onClick={() => setSelectedMarket(market.id)}
+            >
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xl">{getAssetIcon(market.base_unit)}</span>
+                  <span className="font-bold text-white text-lg">{market.name}</span>
+                </div>
+                <div className="text-sm text-white/70">
+                  Vol: {Number.parseFloat(market.ticker.volume).toFixed(4)} {market.base_unit.toUpperCase()}
+                </div>
+              </div>
+
+              <div className="text-right">
+                <div className="font-bold text-white text-lg">{formatPrice(market.ticker.last)}</div>
+                <div className={`text-sm font-medium ${getChangeColor(market.ticker.change)}`}>
+                  {Number.parseFloat(market.ticker.change) > 0 ? "+" : ""}
+                  {market.ticker.change}%
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center text-white/70 py-8">
+          <div className="text-lg mb-2">📈</div>
+          <div>No market data available</div>
+        </div>
+      )}
+
+      <div className="mt-4 pt-4 border-t border-white/10">
+        <div className="text-xs text-white/50 text-center">
+          Last updated: {new Date().toLocaleTimeString()} • Powered by Quidax
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // Main Component
 export default function KitoSwapDEX() {
   const { isConnected, account, getBalance } = useWeb3()
@@ -731,6 +916,11 @@ export default function KitoSwapDEX() {
         {/* MetaMask Test Panel */}
         <div className="container mx-auto px-4 mb-8">
           <MetaMaskTestPanel addToast={addToast} />
+        </div>
+
+        {/* Market Data */}
+        <div className="container mx-auto px-4 mb-8">
+          <QuidaxMarketData addToast={addToast} />
         </div>
 
         {/* Footer */}
