@@ -14,9 +14,11 @@
   ],
   "env": {
     "QUIDAX_API_KEY": "@quidax_api_key",
-    "NEXT_PUBLIC_RPC_BSC": "@rpc_bsc",
-    "NEXT_PUBLIC_FACTORY_ADDRESS": "@factory_address",
+    "NEXT_PUBLIC_BSC_RPC_URL": "@bsc_rpc_url",
+    "NEXT_PUBLIC_METALBUILD_RPC_URL": "@metalbuild_rpc_url",
+    "NEXT_PUBLIC_WEB3AUTH_CLIENT_ID": "@web3auth_client_id",
     "NEXT_PUBLIC_ROUTER_ADDRESS": "@router_address",
+    "NEXT_PUBLIC_FACTORY_ADDRESS": "@factory_address",
     "NEXT_PUBLIC_CHAIN_ID": "@chain_id"
   },
   "functions": {

@@ -63,27 +63,189 @@ function Toast({ toast, onRemove }) {
   )
 }
 
-// Mock Web3 Context
+// Mock Web3 Context with token balances
 function useWeb3() {
   const [isConnected, setIsConnected] = useState(false)
   const [account, setAccount] = useState("")
+  const [selectedNetwork, setSelectedNetwork] = useState("BSC")
+  const [tokenBalances, setTokenBalances] = useState({})
+
+  // Mock token balances for different networks
+  const mockBalances = {
+    BSC: {
+      "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c": "12.5432", // WBNB
+      "0x55d398326f99059fF775485246999027B3197955": "8,456.78", // USDT
+      "0x553a0d5074b5f57b90594c9c5db3289a17ee8b9c": "1,234,567.89", // KBC
+      "0x386c66a0a3d452b7296c0763296fc7d9124e62f8": "987,654.32", // KBB
+    },
+    METAL: {
+      "0x0000000000000000000000000000000000000000": "45.6789", // WMTL
+      "0x0000000000000000000000000000000000000001": "12,345.67", // USDT
+      "0x553a0d5074b5f57b90594c9c5db3289a17ee8b9c": "2,345,678.90", // KBC
+      "0x386c66a0a3d452b7296c0763296fc7d9124e62f8": "1,876,543.21", // KBB
+    },
+  }
+
+  useEffect(() => {
+    if (isConnected) {
+      setTokenBalances(mockBalances[selectedNetwork])
+    }
+  }, [isConnected, selectedNetwork])
+
+  const getTokenBalance = (tokenAddress) => {
+    if (!isConnected || !tokenBalances[tokenAddress]) return "0.00"
+    return tokenBalances[tokenAddress]
+  }
+
+  const updateTokenBalance = (tokenAddress, newBalance) => {
+    setTokenBalances((prev) => ({
+      ...prev,
+      [tokenAddress]: newBalance,
+    }))
+  }
 
   return {
     isConnected,
     account,
+    selectedNetwork,
+    setSelectedNetwork,
+    tokenBalances,
+    getTokenBalance,
+    updateTokenBalance,
     connect: () => {
       setIsConnected(true)
       setAccount("0xa36f...4f81")
+      setTokenBalances(mockBalances[selectedNetwork])
       return Promise.resolve({ provider: {}, account: "0xa36f...4f81" })
     },
     disconnect: () => {
       setIsConnected(false)
       setAccount("")
+      setTokenBalances({})
       return Promise.resolve()
     },
     getBalance: () => Promise.resolve("12.5432"),
     getSigner: () => Promise.resolve({}),
   }
+}
+
+// Network configurations
+const NETWORKS = {
+  BSC: {
+    name: "BSC Mainnet",
+    chainId: 56,
+    rpcUrl: process.env.NEXT_PUBLIC_RPC_BSC,
+    tokens: {
+      WBNB: { symbol: "WBNB", name: "Wrapped BNB", address: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c" },
+      USDT: { symbol: "USDT", name: "Tether USD", address: "0x55d398326f99059fF775485246999027B3197955" },
+      KBC: { symbol: "KBC", name: "KBC Gospel Token", address: "0x553a0d5074b5f57b90594c9c5db3289a17ee8b9c" },
+      KBB: { symbol: "KBB", name: "KBB Family Token", address: "0x386c66a0a3d452b7296c0763296fc7d9124e62f8" },
+    },
+  },
+  METAL: {
+    name: "Metal Build",
+    chainId: 1750,
+    rpcUrl: process.env.NEXT_PUBLIC_RPC_METAL,
+    tokens: {
+      WMTL: { symbol: "WMTL", name: "Wrapped Metal", address: "0x0000000000000000000000000000000000000000" },
+      USDT: { symbol: "USDT", name: "Tether USD", address: "0x0000000000000000000000000000000000000001" },
+      KBC: { symbol: "KBC", name: "KBC Gospel Token", address: "0x553a0d5074b5f57b90594c9c5db3289a17ee8b9c" },
+      KBB: { symbol: "KBB", name: "KBB Family Token", address: "0x386c66a0a3d452b7296c0763296fc7d9124e62f8" },
+    },
+  },
+}
+
+// Token Balance Display Component
+function TokenBalanceCard({ selectedNetwork, getTokenBalance, addToast }) {
+  const networkConfig = NETWORKS[selectedNetwork]
+  const tokens = Object.values(networkConfig.tokens)
+
+  const refreshBalances = async () => {
+    addToast("Refreshing token balances...", "info", 2000)
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    addToast("Token balances updated!", "success", 2000)
+  }
+
+  return (
+    <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 shadow-lg">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+          <span>💰</span>
+          Token Balances - {networkConfig.name}
+        </h3>
+        <button
+          onClick={refreshBalances}
+          className="text-white/70 hover:text-white transition-colors text-sm"
+          title="Refresh balances"
+        >
+          🔄
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {tokens.map((token) => {
+          const balance = getTokenBalance(token.address)
+          const isKitoToken = ["KBC", "KBB"].includes(token.symbol)
+
+          return (
+            <div
+              key={token.address}
+              className={`bg-white/5 rounded-lg p-4 border transition-all ${
+                isKitoToken ? "border-yellow-500/30 bg-yellow-500/10" : "border-white/10"
+              }`}
+            >
+              <div className="flex justify-between items-center">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-white text-lg">{token.symbol}</span>
+                    {isKitoToken && <span className="text-yellow-400 text-xs">⭐ KITO</span>}
+                  </div>
+                  <div className="text-white/70 text-sm">{token.name}</div>
+                  <div className="text-white/50 text-xs font-mono">
+                    {token.address.slice(0, 8)}...{token.address.slice(-6)}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className={`font-bold text-xl ${isKitoToken ? "text-yellow-400" : "text-white"}`}>{balance}</div>
+                  <div className="text-white/70 text-sm">{token.symbol}</div>
+                </div>
+              </div>
+
+              {/* USD Value (mock) */}
+              <div className="mt-3 pt-3 border-t border-white/10">
+                <div className="flex justify-between text-sm">
+                  <span className="text-white/70">USD Value:</span>
+                  <span className="text-green-400 font-medium">
+                    $
+                    {isKitoToken
+                      ? (Number.parseFloat(balance.replace(/,/g, "")) * 0.001).toFixed(2)
+                      : token.symbol === "USDT"
+                        ? balance
+                        : (Number.parseFloat(balance.replace(/,/g, "")) * 645.23).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Total Portfolio Value */}
+      <div className="mt-6 pt-4 border-t border-white/10">
+        <div className="bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-lg p-4 border border-blue-500/30">
+          <div className="flex justify-between items-center">
+            <span className="text-white font-medium">Total Portfolio Value:</span>
+            <span className="text-2xl font-bold text-green-400">
+              ${selectedNetwork === "BSC" ? "8,123,456.78" : "1,567,890.12"}
+            </span>
+          </div>
+          <div className="text-white/70 text-sm mt-1">
+            Across {tokens.length} tokens on {networkConfig.name}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // Auth Buttons Component
@@ -157,585 +319,253 @@ function AuthButtons({ addToast }) {
   )
 }
 
-// Add Token Buttons Component
-function AddTokenButtons({ token, addToast }) {
-  const [isAdding, setIsAdding] = useState(false)
-
-  const addTokenToMetaMask = async () => {
-    // Check if MetaMask is installed
-    if (typeof window === "undefined" || !window.ethereum) {
-      addToast("MetaMask not detected. Please install MetaMask extension.", "error", 5000)
-      return
-    }
-
-    try {
-      setIsAdding(true)
-      addToast(`Adding ${token.symbol} to MetaMask...`, "info", 2000)
-
-      // Simulate MetaMask interaction
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      addToast(
-        <div>
-          ✅ {token.symbol} successfully added to MetaMask!
-          <div className="text-xs mt-1 opacity-80">
-            Address: {token.address.slice(0, 10)}...{token.address.slice(-8)}
-          </div>
-        </div>,
-        "success",
-        5000,
-      )
-    } catch (error) {
-      addToast(`Failed to add ${token.symbol}: ${error.message}`, "error", 5000)
-    } finally {
-      setIsAdding(false)
-    }
-  }
-
-  // Only show button for KBC and KBB tokens
-  if (!["KBC", "KBB"].includes(token.symbol)) {
-    return null
-  }
-
-  return (
-    <button
-      onClick={addTokenToMetaMask}
-      disabled={isAdding}
-      className="bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 text-white px-3 py-1 rounded-md text-xs font-medium transition-all transform hover:scale-105 disabled:hover:scale-100 flex items-center gap-1 shadow-md"
-      title={`Add ${token.symbol} to MetaMask`}
-    >
-      {isAdding ? (
-        <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin"></div>
-      ) : (
-        <span>🦊</span>
-      )}
-      Add {token.symbol}
-    </button>
-  )
-}
-
-// MetaMask Test Panel Component
-function MetaMaskTestPanel({ addToast }) {
-  const [metaMaskStatus, setMetaMaskStatus] = useState({
-    installed: typeof window !== "undefined" && typeof window.ethereum !== "undefined",
-    connected: false,
-    chainId: "0x38",
-    account: null,
+// Metal.build Integration Component
+function MetalBuildIntegration({ selectedNetwork, addToast }) {
+  const [metalStats, setMetalStats] = useState({
+    totalVolume: "$13,964,247",
+    kbcLiquidity: "$456,789",
+    kbbLiquidity: "$234,567",
+    isConnected: selectedNetwork === "METAL",
   })
 
-  const tokens = [
-    {
-      symbol: "KBC",
-      name: "KBC Gospel Token",
-      address: "0x553a0d5074b5f57b90594c9c5db3289a17ee8b9c",
-      decimals: 18,
-      logoURI: "https://www.manamix.space/assets/kbc-logo.png",
-    },
-    {
-      symbol: "KBB",
-      name: "KBB Family Token",
-      address: "0x386c66a0a3d452b7296c0763296fc7d9124e62f8",
-      decimals: 18,
-      logoURI: "https://www.manamix.space/assets/kbb-logo.png",
-    },
-  ]
-
-  const kbcToken = tokens.find((t) => t.symbol === "KBC")
-  const kbbToken = tokens.find((t) => t.symbol === "KBB")
-
-  const checkMetaMaskStatus = () => {
-    if (typeof window !== "undefined" && window.ethereum) {
-      setMetaMaskStatus((prev) => ({
-        ...prev,
-        installed: true,
-      }))
-    }
-  }
-
-  useEffect(() => {
-    checkMetaMaskStatus()
-  }, [])
-
-  const connectMetaMask = async () => {
-    if (typeof window === "undefined" || !window.ethereum) {
-      addToast("MetaMask not installed", "error", 3000)
-      return
-    }
-
+  const connectToMetal = async () => {
     try {
-      addToast("Connecting to MetaMask...", "info", 2000)
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      setMetaMaskStatus((prev) => ({ ...prev, connected: true, account: "0xa36f...4f81" }))
-      addToast("MetaMask connected successfully!", "success", 3000)
+      addToast("Connecting to Metal.build...", "info", 2000)
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+
+      setMetalStats((prev) => ({ ...prev, isConnected: true }))
+      addToast("Successfully connected to Metal.build!", "success", 3000)
     } catch (error) {
-      addToast("Failed to connect to MetaMask", "error", 3000)
+      addToast("Failed to connect to Metal.build", "error", 3000)
     }
-  }
-
-  const switchToBSC = async () => {
-    if (typeof window === "undefined" || !window.ethereum) {
-      addToast("MetaMask not installed", "error", 3000)
-      return
-    }
-
-    try {
-      addToast("Switching to BSC Mainnet...", "info", 2000)
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      setMetaMaskStatus((prev) => ({ ...prev, chainId: "0x38" }))
-      addToast("Switched to BSC Mainnet", "success", 3000)
-    } catch (error) {
-      addToast("Failed to switch network", "error", 3000)
-    }
-  }
-
-  const getChainName = (chainId) => {
-    switch (chainId) {
-      case "0x38":
-        return "BSC Mainnet"
-      case "0x1":
-        return "Ethereum Mainnet"
-      case "0x89":
-        return "Polygon"
-      default:
-        return `Unknown (${chainId})`
-    }
-  }
-
-  const getStatusColor = (status) => {
-    return status ? "text-green-400" : "text-red-400"
   }
 
   return (
     <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 shadow-lg">
-      <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-        <span>🦊</span>
-        MetaMask Integration Test
-      </h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+          <div className="w-8 h-8 bg-yellow-500 rounded flex items-center justify-center">⚡</div>
+          Metal.build Integration
+        </h3>
+        <div className={`w-3 h-3 rounded-full ${metalStats.isConnected ? "bg-green-400" : "bg-red-400"}`}></div>
+      </div>
 
-      {/* MetaMask Status */}
-      <div className="space-y-3 mb-6">
-        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-          <h4 className="text-white font-medium mb-3">Connection Status</h4>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-white/70">MetaMask Installed:</span>
-              <span className={getStatusColor(metaMaskStatus.installed)}>
-                {metaMaskStatus.installed ? "✅ Yes" : "❌ No"}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-white/70">Connected:</span>
-              <span className={getStatusColor(metaMaskStatus.connected)}>
-                {metaMaskStatus.connected ? "✅ Yes" : "❌ No"}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-white/70">Network:</span>
-              <span className={metaMaskStatus.chainId === "0x38" ? "text-green-400" : "text-yellow-400"}>
-                {metaMaskStatus.chainId ? getChainName(metaMaskStatus.chainId) : "Unknown"}
-              </span>
-            </div>
-            {metaMaskStatus.account && (
-              <div className="flex justify-between">
-                <span className="text-white/70">Account:</span>
-                <span className="text-white font-mono text-xs">
-                  {metaMaskStatus.account.slice(0, 6)}...{metaMaskStatus.account.slice(-4)}
-                </span>
-              </div>
-            )}
-          </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10 text-center">
+          <div className="text-xl font-bold text-yellow-400">{metalStats.totalVolume}</div>
+          <div className="text-white/70 text-sm">Total Volume</div>
         </div>
-
-        {/* Action Buttons */}
-        <div className="flex gap-3">
-          {!metaMaskStatus.connected && (
-            <button
-              onClick={connectMetaMask}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-all text-sm"
-            >
-              Connect MetaMask
-            </button>
-          )}
-          {metaMaskStatus.chainId !== "0x38" && (
-            <button
-              onClick={switchToBSC}
-              className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg font-medium transition-all text-sm"
-            >
-              Switch to BSC
-            </button>
-          )}
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10 text-center">
+          <div className="text-xl font-bold text-blue-400">{metalStats.kbcLiquidity}</div>
+          <div className="text-white/70 text-sm">KBC Liquidity</div>
+        </div>
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10 text-center">
+          <div className="text-xl font-bold text-purple-400">{metalStats.kbbLiquidity}</div>
+          <div className="text-white/70 text-sm">KBB Liquidity</div>
         </div>
       </div>
 
-      {/* Token Addition Tests */}
-      <div className="space-y-4">
-        <h4 className="text-white font-medium">Test Token Addition</h4>
-
-        {/* KBC Token Test */}
-        {kbcToken && (
-          <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-            <div className="flex justify-between items-center">
-              <div>
-                <div className="text-white font-medium">{kbcToken.name}</div>
-                <div className="text-white/70 text-sm">Symbol: {kbcToken.symbol}</div>
-                <div className="text-white/70 text-xs font-mono">
-                  {kbcToken.address.slice(0, 10)}...{kbcToken.address.slice(-8)}
-                </div>
-              </div>
-              <AddTokenButtons token={kbcToken} addToast={addToast} />
-            </div>
+      {selectedNetwork === "METAL" ? (
+        <div className="bg-green-500/20 border border-green-500/30 rounded-lg p-4">
+          <div className="flex items-center gap-2 text-green-300">
+            <span>✅</span>
+            <span className="font-medium">Connected to Metal.build Network</span>
           </div>
-        )}
-
-        {/* KBB Token Test */}
-        {kbbToken && (
-          <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-            <div className="flex justify-between items-center">
-              <div>
-                <div className="text-white font-medium">{kbbToken.name}</div>
-                <div className="text-white/70 text-sm">Symbol: {kbbToken.symbol}</div>
-                <div className="text-white/70 text-xs font-mono">
-                  {kbbToken.address.slice(0, 10)}...{kbbToken.address.slice(-8)}
-                </div>
-              </div>
-              <AddTokenButtons token={kbbToken} addToast={addToast} />
-            </div>
+          <div className="text-green-200 text-sm mt-1">
+            KBC and KBB tokens are now available for trading and liquidity provision
           </div>
-        )}
-      </div>
-
-      {/* Instructions */}
-      <div className="mt-6 p-4 bg-blue-500/20 border border-blue-500/30 rounded-lg">
-        <h5 className="text-blue-300 font-medium mb-2">Testing Instructions:</h5>
-        <ol className="text-blue-200 text-sm space-y-1 list-decimal list-inside">
-          <li>Ensure MetaMask is installed and connected</li>
-          <li>Switch to BSC Mainnet if not already connected</li>
-          <li>Click "Add KBC" or "Add KBB" buttons</li>
-          <li>Approve the token addition in MetaMask popup</li>
-          <li>Verify tokens appear in your MetaMask token list</li>
-        </ol>
-      </div>
+        </div>
+      ) : (
+        <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-yellow-300 font-medium">Switch to Metal.build Network</div>
+              <div className="text-yellow-200 text-sm">Access KBC/KBB liquidity pools</div>
+            </div>
+            <button
+              onClick={connectToMetal}
+              className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg font-medium transition-all"
+            >
+              Connect
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-// Transfer Buttons Component
-function TransferButtons({ addToast }) {
-  const { account, isConnected } = useWeb3()
-  const [showSendModal, setShowSendModal] = useState(false)
-  const [showReceiveModal, setShowReceiveModal] = useState(false)
-  const [recipient, setRecipient] = useState("")
-  const [amount, setAmount] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
+// Swap Interface Component with token balances
+function SwapInterface({ selectedNetwork, addToast }) {
+  const { isConnected, getTokenBalance, updateTokenBalance } = useWeb3()
+  const [selectedTokenIn, setSelectedTokenIn] = useState("")
+  const [selectedTokenOut, setSelectedTokenOut] = useState("")
+  const [amountIn, setAmountIn] = useState("")
+  const [amountOut, setAmountOut] = useState("")
+  const [isSwapping, setIsSwapping] = useState(false)
 
-  const handleSend = async () => {
-    if (!recipient || !amount) {
-      addToast("Please fill all fields", "error", 3000)
+  const networkConfig = NETWORKS[selectedNetwork]
+  const tokens = Object.values(networkConfig.tokens)
+
+  useEffect(() => {
+    if (tokens.length >= 2) {
+      setSelectedTokenIn(tokens[0].address)
+      setSelectedTokenOut(tokens[1].address)
+    }
+  }, [selectedNetwork])
+
+  // Auto-calculate output amount
+  useEffect(() => {
+    if (amountIn && Number.parseFloat(amountIn) > 0) {
+      const mockRate = selectedNetwork === "BSC" ? 0.95 : 1.02
+      const calculated = (Number.parseFloat(amountIn) * mockRate).toFixed(6)
+      setAmountOut(calculated)
+    } else {
+      setAmountOut("")
+    }
+  }, [amountIn, selectedTokenIn, selectedTokenOut, selectedNetwork])
+
+  const handleSwap = async () => {
+    if (!amountIn || !amountOut) {
+      addToast("Please enter a valid amount", "error", 3000)
+      return
+    }
+
+    const currentBalance = Number.parseFloat(getTokenBalance(selectedTokenIn).replace(/,/g, ""))
+    const swapAmount = Number.parseFloat(amountIn)
+
+    if (swapAmount > currentBalance) {
+      addToast("Insufficient balance for this swap", "error", 3000)
       return
     }
 
     try {
-      setIsLoading(true)
-      addToast("Preparing transaction...", "info", 2000)
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      setIsSwapping(true)
+      addToast("Executing swap...", "info", 2000)
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+
+      const tokenInSymbol = tokens.find((t) => t.address === selectedTokenIn)?.symbol
+      const tokenOutSymbol = tokens.find((t) => t.address === selectedTokenOut)?.symbol
+
+      // Update balances
+      const newBalanceIn = (currentBalance - swapAmount).toFixed(4)
+      const currentBalanceOut = Number.parseFloat(getTokenBalance(selectedTokenOut).replace(/,/g, ""))
+      const newBalanceOut = (currentBalanceOut + Number.parseFloat(amountOut)).toFixed(4)
+
+      updateTokenBalance(selectedTokenIn, newBalanceIn)
+      updateTokenBalance(selectedTokenOut, newBalanceOut)
 
       addToast(
         <div>
-          Transaction confirmed!
-          <a href="#" className="underline ml-1">
-            View on BSCScan
-          </a>
+          ✅ Swap completed successfully!
+          <div className="text-xs mt-1">
+            {amountIn} {tokenInSymbol} → {amountOut} {tokenOutSymbol}
+          </div>
         </div>,
         "success",
         5000,
       )
 
-      setRecipient("")
-      setAmount("")
-      setShowSendModal(false)
+      setAmountIn("")
+      setAmountOut("")
     } catch (error) {
-      addToast(`Transaction failed: ${error.message}`, "error", 5000)
+      addToast(`Swap failed: ${error.message}`, "error", 5000)
     } finally {
-      setIsLoading(false)
+      setIsSwapping(false)
     }
   }
 
-  const handleReceive = () => {
-    if (!account) {
-      addToast("Please connect your wallet first", "error", 3000)
-      return
-    }
-    setShowReceiveModal(true)
-  }
-
-  const copyToClipboard = async () => {
-    try {
-      await navigator.clipboard.writeText(account || "0xa36f...4f81")
-      addToast("Address copied to clipboard!", "success", 2000)
-    } catch (error) {
-      addToast("Failed to copy address", "error", 2000)
-    }
-  }
-
-  return (
-    <>
-      {/* Transfer Buttons */}
-      <div className="flex gap-4 justify-center mb-6">
-        <button
-          onClick={() => setShowSendModal(true)}
-          disabled={!isConnected}
-          className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-gray-600 disabled:to-gray-600 text-white px-6 py-3 rounded-lg font-medium transition-all transform hover:scale-105 disabled:hover:scale-100 shadow-lg flex items-center gap-2"
-        >
-          <span>📤</span>
-          Send BNB
-        </button>
-        <button
-          onClick={handleReceive}
-          disabled={!isConnected}
-          className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 disabled:from-gray-600 disabled:to-gray-600 text-white px-6 py-3 rounded-lg font-medium transition-all transform hover:scale-105 disabled:hover:scale-100 shadow-lg flex items-center gap-2"
-        >
-          <span>📥</span>
-          Receive
-        </button>
-      </div>
-
-      {/* Send Modal */}
-      {showSendModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 shadow-lg max-w-md w-full">
-            <h3 className="text-xl font-bold text-white mb-4">Send BNB</h3>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-white text-sm font-medium mb-2">Recipient Address</label>
-                <input
-                  type="text"
-                  value={recipient}
-                  onChange={(e) => setRecipient(e.target.value)}
-                  placeholder="0x..."
-                  className="w-full bg-white/20 text-white border border-white/30 rounded-lg px-3 py-2 placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-white text-sm font-medium mb-2">Amount (BNB)</label>
-                <input
-                  type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="0.0"
-                  step="0.001"
-                  className="w-full bg-white/20 text-white border border-white/30 rounded-lg px-3 py-2 placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={() => setShowSendModal(false)}
-                  disabled={isLoading}
-                  className="flex-1 bg-white/20 hover:bg-white/30 disabled:bg-white/10 text-white py-2 rounded-lg font-medium transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSend}
-                  disabled={isLoading || !recipient || !amount}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white py-2 rounded-lg font-medium transition-all"
-                >
-                  {isLoading ? "Sending..." : "Send"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Receive Modal */}
-      {showReceiveModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 shadow-lg max-w-md w-full">
-            <h3 className="text-xl font-bold text-white mb-4">Receive BNB</h3>
-
-            <div className="text-center space-y-4">
-              <div className="bg-white p-4 rounded-lg inline-block">
-                <div className="w-48 h-48 bg-gray-200 flex items-center justify-center text-gray-600">QR Code</div>
-              </div>
-
-              <div>
-                <p className="text-white/70 text-sm mb-2">Your Wallet Address:</p>
-                <div className="bg-white/20 rounded-lg p-3 break-all text-white font-mono text-sm">
-                  {account || "0xa36f...4f81"}
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={copyToClipboard}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium transition-all"
-                >
-                  Copy Address
-                </button>
-                <button
-                  onClick={() => setShowReceiveModal(false)}
-                  className="flex-1 bg-white/20 hover:bg-white/30 text-white py-2 rounded-lg font-medium transition-all"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  )
-}
-
-// Quidax Market Data Component
-function QuidaxMarketData({ addToast }) {
-  const [marketData, setMarketData] = useState([
-    {
-      id: "btcngn",
-      name: "BTC/NGN",
-      base_unit: "btc",
-      quote_unit: "ngn",
-      ticker: {
-        last: "45000000.0",
-        high: "46000000.0",
-        low: "44000000.0",
-        change: "+2.3",
-        volume: "12.45",
-      },
-    },
-    {
-      id: "ethngn",
-      name: "ETH/NGN",
-      base_unit: "eth",
-      quote_unit: "ngn",
-      ticker: {
-        last: "2800000.0",
-        high: "2850000.0",
-        low: "2750000.0",
-        change: "+1.8",
-        volume: "156.78",
-      },
-    },
-    {
-      id: "usdtngn",
-      name: "USDT/NGN",
-      base_unit: "usdt",
-      quote_unit: "ngn",
-      ticker: {
-        last: "1580.0",
-        high: "1585.0",
-        low: "1575.0",
-        change: "+0.3",
-        volume: "45678.90",
-      },
-    },
-  ])
-  const [selectedMarket, setSelectedMarket] = useState("btcngn")
-  const [isLoading, setIsLoading] = useState(false)
-
-  const fetchMarketData = async () => {
-    setIsLoading(true)
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      addToast("Market data updated", "success", 2000)
-    } catch (error) {
-      addToast(`Failed to fetch market data: ${error.message}`, "error", 5000)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const formatPrice = (price) => {
-    const numPrice = Number.parseFloat(price)
-    if (numPrice >= 1000000) {
-      return `₦${(numPrice / 1000000).toFixed(2)}M`
-    } else if (numPrice >= 1000) {
-      return `₦${(numPrice / 1000).toFixed(2)}K`
-    }
-    return `₦${numPrice.toFixed(2)}`
-  }
-
-  const getChangeColor = (change) => {
-    const numChange = Number.parseFloat(change)
-    if (numChange > 0) return "text-green-400"
-    if (numChange < 0) return "text-red-400"
-    return "text-white/70"
-  }
-
-  const getAssetIcon = (symbol) => {
-    const icons = {
-      btc: "₿",
-      eth: "Ξ",
-      usdt: "💵",
-      ada: "🔷",
-      dot: "⚫",
-    }
-    return icons[symbol] || "💰"
+  const setMaxAmount = () => {
+    const balance = getTokenBalance(selectedTokenIn).replace(/,/g, "")
+    setAmountIn(balance)
   }
 
   return (
     <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 shadow-lg">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-bold text-white flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-green-400"></div>
-          Quidax Market Data
-        </h3>
+      <h2 className="text-xl font-bold text-white mb-6 text-center">Swap Tokens - {networkConfig.name}</h2>
+
+      <div className="space-y-4">
+        {/* Token Input */}
+        <div>
+          <label className="block text-white text-sm font-medium mb-2">From</label>
+          <select
+            value={selectedTokenIn}
+            onChange={(e) => setSelectedTokenIn(e.target.value)}
+            className="w-full bg-white/20 text-white border border-white/30 rounded-lg px-3 py-2 mb-2 focus:outline-none focus:ring-2 focus:ring-[#4B6CB7]"
+          >
+            {tokens.map((token) => (
+              <option key={token.address} value={token.address}>
+                {token.symbol} - {token.name}
+              </option>
+            ))}
+          </select>
+          <input
+            type="number"
+            value={amountIn}
+            onChange={(e) => setAmountIn(e.target.value)}
+            placeholder="0.0"
+            className="w-full bg-white/20 text-white border border-white/30 rounded-lg px-3 py-2 placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-[#4B6CB7]"
+          />
+          <div className="text-white/70 text-sm mt-1 flex justify-between">
+            <span>
+              Balance: {getTokenBalance(selectedTokenIn)} {tokens.find((t) => t.address === selectedTokenIn)?.symbol}
+            </span>
+            <button onClick={setMaxAmount} className="text-[#4B6CB7] hover:text-blue-300 text-xs underline">
+              MAX
+            </button>
+          </div>
+        </div>
+
+        {/* Swap Direction Button */}
+        <div className="flex justify-center">
+          <button
+            onClick={() => {
+              const temp = selectedTokenIn
+              setSelectedTokenIn(selectedTokenOut)
+              setSelectedTokenOut(temp)
+              setAmountIn("")
+              setAmountOut("")
+            }}
+            className="bg-white/20 hover:bg-white/30 text-white p-3 rounded-full transition-all transform hover:rotate-180"
+          >
+            ↕️
+          </button>
+        </div>
+
+        {/* Token Output */}
+        <div>
+          <label className="block text-white text-sm font-medium mb-2">To</label>
+          <select
+            value={selectedTokenOut}
+            onChange={(e) => setSelectedTokenOut(e.target.value)}
+            className="w-full bg-white/20 text-white border border-white/30 rounded-lg px-3 py-2 mb-2 focus:outline-none focus:ring-2 focus:ring-[#4B6CB7]"
+          >
+            {tokens.map((token) => (
+              <option key={token.address} value={token.address}>
+                {token.symbol} - {token.name}
+              </option>
+            ))}
+          </select>
+          <input
+            type="number"
+            value={amountOut}
+            placeholder="0.0"
+            readOnly
+            className="w-full bg-white/10 text-white border border-white/30 rounded-lg px-3 py-2 placeholder-white/50"
+          />
+          <div className="text-white/70 text-sm mt-1">
+            Balance: {getTokenBalance(selectedTokenOut)} {tokens.find((t) => t.address === selectedTokenOut)?.symbol}
+          </div>
+        </div>
+
+        {/* Swap Button */}
         <button
-          onClick={fetchMarketData}
-          className="text-white/70 hover:text-white transition-colors text-sm"
-          title="Refresh market data"
+          onClick={handleSwap}
+          disabled={!isConnected || !amountIn || isSwapping}
+          className="w-full bg-gradient-to-r from-[#4B6CB7] to-[#182848] hover:from-blue-700 hover:to-[#1a2a4a] disabled:from-gray-600 disabled:to-gray-600 text-white py-4 rounded-lg font-bold text-lg transition-all transform hover:scale-105 disabled:hover:scale-100 shadow-lg"
         >
-          🔄
+          {!isConnected ? "Connect Wallet" : isSwapping ? "Swapping..." : "Swap"}
         </button>
-      </div>
-
-      {marketData.length > 0 ? (
-        <div className="space-y-3">
-          {marketData.map((market) => (
-            <div
-              key={market.id}
-              className={`flex justify-between items-center p-4 rounded-lg border transition-all cursor-pointer ${
-                selectedMarket === market.id
-                  ? "bg-[#4B6CB7]/20 border-[#4B6CB7]/50"
-                  : "bg-white/5 border-white/10 hover:bg-white/10"
-              }`}
-              onClick={() => setSelectedMarket(market.id)}
-            >
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xl">{getAssetIcon(market.base_unit)}</span>
-                  <span className="font-bold text-white text-lg">{market.name}</span>
-                </div>
-                <div className="text-sm text-white/70">
-                  Vol: {Number.parseFloat(market.ticker.volume).toFixed(4)} {market.base_unit.toUpperCase()}
-                </div>
-              </div>
-
-              <div className="text-right">
-                <div className="font-bold text-white text-lg">{formatPrice(market.ticker.last)}</div>
-                <div className={`text-sm font-medium ${getChangeColor(market.ticker.change)}`}>
-                  {Number.parseFloat(market.ticker.change) > 0 ? "+" : ""}
-                  {market.ticker.change}%
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center text-white/70 py-8">
-          <div className="text-lg mb-2">📈</div>
-          <div>No market data available</div>
-        </div>
-      )}
-
-      <div className="mt-4 pt-4 border-t border-white/10">
-        <div className="text-xs text-white/50 text-center">
-          Last updated: {new Date().toLocaleTimeString()} • Powered by Quidax
-        </div>
       </div>
     </div>
   )
@@ -743,52 +573,9 @@ function QuidaxMarketData({ addToast }) {
 
 // Main Component
 export default function KitoSwapDEX() {
-  const { isConnected, account, getBalance } = useWeb3()
   const { toasts, addToast, removeToast } = useToast()
-  const [balance, setBalance] = useState("0")
-  const [selectedTokenIn, setSelectedTokenIn] = useState("")
-  const [selectedTokenOut, setSelectedTokenOut] = useState("")
-  const [amountIn, setAmountIn] = useState("")
-
-  const tokens = [
-    {
-      symbol: "WBNB",
-      name: "Wrapped BNB",
-      address: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
-      decimals: 18,
-    },
-    {
-      symbol: "USDT",
-      name: "Tether USD",
-      address: "0x55d398326f99059fF775485246999027B3197955",
-      decimals: 18,
-    },
-    {
-      symbol: "KBC",
-      name: "KBC Gospel Token",
-      address: "0x553a0d5074b5f57b90594c9c5db3289a17ee8b9c",
-      decimals: 18,
-    },
-    {
-      symbol: "KBB",
-      name: "KBB Family Token",
-      address: "0x386c66a0a3d452b7296c0763296fc7d9124e62f8",
-      decimals: 18,
-    },
-  ]
-
-  useEffect(() => {
-    if (tokens.length >= 2) {
-      setSelectedTokenIn(tokens[0].address)
-      setSelectedTokenOut(tokens[1].address)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (isConnected && account) {
-      getBalance().then(setBalance)
-    }
-  }, [isConnected, account])
+  const { selectedNetwork, setSelectedNetwork, isConnected, getTokenBalance } = useWeb3()
+  const [activeSection, setActiveSection] = useState("balances")
 
   return (
     <>
@@ -803,133 +590,97 @@ export default function KitoSwapDEX() {
               <span className="bg-[#4B6CB7] text-white px-3 py-1 rounded-full text-sm font-medium">Production</span>
             </div>
 
-            <AuthButtons addToast={addToast} />
-          </div>
-        </header>
-
-        {/* Transfer Buttons */}
-        <div className="container mx-auto px-4 mb-8">
-          <TransferButtons addToast={addToast} />
-        </div>
-
-        {/* Main Content Grid */}
-        <div className="container mx-auto px-4 grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {/* Swap Interface */}
-          <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 shadow-lg">
-            <h2 className="text-xl font-bold text-white mb-6 text-center">Swap Tokens</h2>
-
-            <div className="space-y-4">
-              {/* Token Input */}
-              <div>
-                <label className="block text-white text-sm font-medium mb-2">From</label>
-                <div className="flex gap-2 mb-2">
-                  <select
-                    value={selectedTokenIn}
-                    onChange={(e) => setSelectedTokenIn(e.target.value)}
-                    className="bg-white/20 text-white border border-white/30 rounded-lg px-3 py-2 flex-1 focus:outline-none focus:ring-2 focus:ring-[#4B6CB7]"
-                  >
-                    {tokens.map((token) => (
-                      <option key={token.address} value={token.address}>
-                        {token.symbol} - {token.name}
-                      </option>
-                    ))}
-                  </select>
-                  {tokens.find((t) => t.address === selectedTokenIn) && (
-                    <AddTokenButtons token={tokens.find((t) => t.address === selectedTokenIn)} addToast={addToast} />
-                  )}
-                </div>
-                <input
-                  type="number"
-                  value={amountIn}
-                  onChange={(e) => setAmountIn(e.target.value)}
-                  placeholder="0.0"
-                  className="w-full bg-white/20 text-white border border-white/30 rounded-lg px-3 py-2 placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-[#4B6CB7]"
-                />
-                <div className="text-white/70 text-sm mt-1">Balance: {balance} BNB</div>
-              </div>
-
-              {/* Swap Direction Button */}
-              <div className="flex justify-center">
-                <button
-                  onClick={() => {
-                    const temp = selectedTokenIn
-                    setSelectedTokenIn(selectedTokenOut)
-                    setSelectedTokenOut(temp)
-                  }}
-                  className="bg-white/20 hover:bg-white/30 text-white p-3 rounded-full transition-all transform hover:rotate-180"
-                >
-                  ↕️
-                </button>
-              </div>
-
-              {/* Token Output */}
-              <div>
-                <label className="block text-white text-sm font-medium mb-2">To</label>
-                <div className="flex gap-2 mb-2">
-                  <select
-                    value={selectedTokenOut}
-                    onChange={(e) => setSelectedTokenOut(e.target.value)}
-                    className="bg-white/20 text-white border border-white/30 rounded-lg px-3 py-2 flex-1 focus:outline-none focus:ring-2 focus:ring-[#4B6CB7]"
-                  >
-                    {tokens.map((token) => (
-                      <option key={token.address} value={token.address}>
-                        {token.symbol} - {token.name}
-                      </option>
-                    ))}
-                  </select>
-                  {tokens.find((t) => t.address === selectedTokenOut) && (
-                    <AddTokenButtons token={tokens.find((t) => t.address === selectedTokenOut)} addToast={addToast} />
-                  )}
-                </div>
-                <input
-                  type="number"
-                  placeholder="0.0"
-                  readOnly
-                  className="w-full bg-white/10 text-white border border-white/30 rounded-lg px-3 py-2 placeholder-white/50"
-                />
-              </div>
-
-              {/* Swap Button */}
-              <button
-                disabled={!isConnected || !amountIn}
-                className="w-full bg-gradient-to-r from-[#4B6CB7] to-[#182848] hover:from-blue-700 hover:to-[#1a2a4a] disabled:from-gray-600 disabled:to-gray-600 text-white py-4 rounded-lg font-bold text-lg transition-all transform hover:scale-105 disabled:hover:scale-100 shadow-lg"
+            <div className="flex items-center gap-4">
+              {/* Network Selector */}
+              <select
+                value={selectedNetwork}
+                onChange={(e) => {
+                  setSelectedNetwork(e.target.value)
+                  addToast(`Switched to ${NETWORKS[e.target.value].name}`, "success", 3000)
+                }}
+                className="bg-[#182848] text-white border-2 border-[#4B6CB7] rounded-lg px-4 py-2 font-medium focus:outline-none focus:ring-2 focus:ring-[#4B6CB7] focus:border-transparent transition-all shadow-md"
               >
-                {!isConnected ? "Connect Wallet" : "Swap"}
+                <option value="BSC">BSC Mainnet</option>
+                <option value="METAL">Metal Build</option>
+              </select>
+
+              <AuthButtons addToast={addToast} />
+            </div>
+          </div>
+
+          {/* Navigation */}
+          <div className="flex justify-center mb-8">
+            <div className="flex bg-white/10 rounded-lg p-1">
+              <button
+                onClick={() => setActiveSection("balances")}
+                className={`px-6 py-2 rounded-md font-medium transition-all ${
+                  activeSection === "balances" ? "bg-green-600 text-white" : "text-white/70 hover:text-white"
+                }`}
+              >
+                💰 Balances
+              </button>
+              <button
+                onClick={() => setActiveSection("swap")}
+                className={`px-6 py-2 rounded-md font-medium transition-all ${
+                  activeSection === "swap" ? "bg-blue-600 text-white" : "text-white/70 hover:text-white"
+                }`}
+              >
+                🔄 Swap
+              </button>
+              <button
+                onClick={() => setActiveSection("liquidity")}
+                className={`px-6 py-2 rounded-md font-medium transition-all ${
+                  activeSection === "liquidity" ? "bg-purple-600 text-white" : "text-white/70 hover:text-white"
+                }`}
+              >
+                💧 Liquidity
               </button>
             </div>
           </div>
+        </header>
 
-          {/* Quidax Ramp Placeholder */}
-          <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 shadow-lg">
-            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-              <span>🏦</span>
-              Quidax NGN On/Off Ramp
-            </h3>
-            <div className="text-center text-white/70 py-8">
-              <div className="text-lg mb-2">💱</div>
-              <div>Buy/Sell crypto with Nigerian Naira</div>
-              <div className="text-sm mt-2">Coming soon...</div>
+        {/* Metal.build Integration */}
+        <div className="container mx-auto px-4 mb-8">
+          <MetalBuildIntegration selectedNetwork={selectedNetwork} addToast={addToast} />
+        </div>
+
+        {/* Main Content */}
+        <div className="container mx-auto px-4 mb-8">
+          {activeSection === "balances" && isConnected && (
+            <TokenBalanceCard selectedNetwork={selectedNetwork} getTokenBalance={getTokenBalance} addToast={addToast} />
+          )}
+
+          {activeSection === "balances" && !isConnected && (
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">🔗</div>
+              <h3 className="text-2xl font-bold text-white mb-2">Connect Your Wallet</h3>
+              <p className="text-white/70 mb-6">Connect your wallet to view token balances</p>
+              <AuthButtons addToast={addToast} />
             </div>
-          </div>
-        </div>
+          )}
 
-        {/* MetaMask Test Panel */}
-        <div className="container mx-auto px-4 mb-8">
-          <MetaMaskTestPanel addToast={addToast} />
-        </div>
+          {activeSection === "swap" && (
+            <div className="max-w-lg mx-auto">
+              <SwapInterface selectedNetwork={selectedNetwork} addToast={addToast} />
+            </div>
+          )}
 
-        {/* Market Data */}
-        <div className="container mx-auto px-4 mb-8">
-          <QuidaxMarketData addToast={addToast} />
+          {activeSection === "liquidity" && (
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">💧</div>
+              <h3 className="text-2xl font-bold text-white mb-2">Liquidity Pools</h3>
+              <p className="text-white/70">Liquidity functionality coming soon...</p>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
         <footer className="text-center text-white/70 text-sm mt-8 pb-8">
-          <p>© 2025 KitoConnect. Production-ready DEX on BNB Smart Chain.</p>
+          <p>© 2025 KitoConnect. Production-ready DEX with Metal.build integration.</p>
           <div className="flex justify-center items-center gap-4 mt-2 flex-wrap">
-            <span>Powered by Web3Auth</span>
+            <span>Powered by {NETWORKS[selectedNetwork].name}</span>
             <span>•</span>
-            <span>Secured by BNB Chain</span>
+            <span>KBC & KBB Tokens</span>
             <span>•</span>
             <span>Built with ❤️</span>
           </div>

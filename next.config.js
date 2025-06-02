@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    appDir: true,
+    appDir: false,
   },
   eslint: {
     ignoreDuringBuilds: true,
@@ -10,8 +10,16 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    domains: ["www.manamix.space", "tokens.pancakeswap.finance"],
+    domains: ["www.manamix.space", "tokens.pancakeswap.finance", "metall2.com"],
     unoptimized: true,
+  },
+  async rewrites() {
+    return [
+      {
+        source: "/api/:path*",
+        destination: "/api/:path*",
+      },
+    ]
   },
 }
 

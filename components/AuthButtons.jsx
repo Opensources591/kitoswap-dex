@@ -3,19 +3,17 @@
 import { useState } from "react"
 import { useWeb3 } from "../contexts/Web3Provider"
 
-export default function AuthButtons({ addToast }) {
-  const { isConnected, account, connect, disconnect, isLoading } = useWeb3()
+export default function AuthButtons() {
+  const { isConnected, account, balance, connect, disconnect, isLoading } = useWeb3()
   const [isConnecting, setIsConnecting] = useState(false)
 
   const handleConnect = async () => {
     try {
       setIsConnecting(true)
-      addToast("Connecting wallet...", "info", 2000)
       await connect()
-      addToast("Wallet connected successfully!", "success", 3000)
     } catch (error) {
       console.error("Connection error:", error)
-      addToast(`Connection failed: ${error.message}`, "error", 5000)
+      alert(`Connection failed: ${error.message}`)
     } finally {
       setIsConnecting(false)
     }
@@ -24,10 +22,9 @@ export default function AuthButtons({ addToast }) {
   const handleDisconnect = async () => {
     try {
       await disconnect()
-      addToast("Wallet disconnected", "info", 2000)
     } catch (error) {
       console.error("Disconnect error:", error)
-      addToast(`Disconnect failed: ${error.message}`, "error", 3000)
+      alert(`Disconnect failed: ${error.message}`)
     }
   }
 
@@ -36,11 +33,15 @@ export default function AuthButtons({ addToast }) {
     return `${address.slice(0, 6)}...${address.slice(-4)}`
   }
 
+  const formatBalance = (bal) => {
+    return Number.parseFloat(bal).toFixed(4)
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center gap-2">
-        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-        <span className="text-white/70 text-sm">Initializing...</span>
+        <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin"></div>
+        <span className="text-gray-600 text-sm">Initializing...</span>
       </div>
     )
   }
@@ -50,7 +51,7 @@ export default function AuthButtons({ addToast }) {
       <button
         onClick={handleConnect}
         disabled={isConnecting}
-        className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-gray-600 disabled:to-gray-600 text-white px-6 py-2 rounded-lg font-medium transition-all transform hover:scale-105 disabled:hover:scale-100 shadow-lg flex items-center gap-2"
+        className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-400 text-white px-6 py-2 rounded-lg font-medium transition-all transform hover:scale-105 disabled:hover:scale-100 shadow-lg flex items-center gap-2"
       >
         {isConnecting ? (
           <>
@@ -69,9 +70,9 @@ export default function AuthButtons({ addToast }) {
 
   return (
     <div className="flex items-center gap-3">
-      <div className="text-white text-sm">
+      <div className="text-gray-700 text-sm">
         <div className="font-medium">{formatAddress(account)}</div>
-        <div className="text-xs text-green-400">Connected</div>
+        <div className="text-xs text-green-600">{formatBalance(balance)} BNB</div>
       </div>
       <button
         onClick={handleDisconnect}
