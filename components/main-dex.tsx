@@ -13,41 +13,121 @@ import {
   CheckCircle,
   AlertCircle,
   Activity,
-  Download,
-  ExternalLink,
 } from "lucide-react"
-import { useWeb3 } from "./web3-provider"
+
+declare global {
+  interface Window {
+    ethereum?: any
+  }
+}
 
 export function MainDexComponent() {
-  const {
-    isConnected,
-    account,
-    chainId,
-    blockNumber,
-    rpcUrl,
-    connectWallet,
-    disconnectWallet,
-    isConnecting,
-    error,
-    isMetaMaskInstalled,
-    isWalletDetected,
-  } = useWeb3()
-
+  const [isConnected, setIsConnected] = useState(false)
+  const [account, setAccount] = useState<string | null>(null)
+  const [chainId, setChainId] = useState<string | null>(null)
+  const [blockNumber, setBlockNumber] = useState<number | null>(null)
+  const [rpcUrl, setRpcUrl] = useState<string | null>(null)
+  const [isConnecting, setIsConnecting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [allPairsLength, setAllPairsLength] = useState<number | null>(null)
 
   useEffect(() => {
-    // Fetch PancakeSwap factory data for smoke test
-    if (rpcUrl) {
-      fetchFactoryData()
+    // Get RPC URL from environment
+    const bscRpc = process.env.NEXT_PUBLIC_RPC_BSC || "https://bsc-dataseed1.binance.org/"
+    setRpcUrl(bscRpc)
+    console.log("BSC RPC:", bscRpc)
+
+    // Check if wallet is already connected
+    checkConnection()
+
+    // Fetch block number on load
+    fetchBlockNumber(bscRpc)
+
+    // Set up interval to fetch block number every 10 seconds
+    const interval = setInterval(() => {
+      fetchBlockNumber(bscRpc)
+    }, 10000)
+
+    // Listen for account changes
+    if (typeof window !== "undefined" && window.ethereum) {
+      window.ethereum.on("accountsChanged", handleAccountsChanged)
+      window.ethereum.on("chainChanged", handleChainChanged)
     }
-  }, [rpcUrl])
+
+    return () => {
+      clearInterval(interval)
+      if (typeof window !== "undefined" && window.ethereum) {
+        window.ethereum.removeListener("accountsChanged", handleAccountsChanged)
+        window.ethereum.removeListener("chainChanged", handleChainChanged)
+      }
+    }
+  }, [])
+
+  const handleAccountsChanged = (accounts: string[]) => {
+    if (accounts.length === 0) {
+      disconnectWallet()
+    } else {
+      setAccount(accounts[0])
+      setIsConnected(true)
+    }
+  }
+
+  const handleChainChanged = (chainId: string) => {
+    setChainId(chainId)
+    window.location.reload() // Recommended by MetaMask
+  }
+
+  const checkConnection = async () => {
+    if (typeof window !== "undefined" && window.ethereum) {
+      try {
+        const accounts = await window.ethereum.request({ method: "eth_accounts" })
+        if (accounts.length > 0) {
+          setAccount(accounts[0])
+          setIsConnected(true)
+
+          const chainId = await window.ethereum.request({ method: "eth_chainId" })
+          setChainId(chainId)
+        }
+      } catch (error) {
+        console.error("Error checking connection:", error)
+      }
+    }
+  }
+
+  const fetchBlockNumber = async (rpcUrl: string) => {
+    try {
+      const response = await fetch(rpcUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          method: "eth_blockNumber",
+          params: [],
+          id: 1,
+        }),
+      })
+
+      const data = await response.json()
+      if (data.result) {
+        const blockNum = Number.parseInt(data.result, 16)
+        setBlockNumber(blockNum)
+        console.log("Latest Block:", blockNum)
+      }
+    } catch (error) {
+      console.error("Error fetching block number:", error)
+    }
+  }
 
   const fetchFactoryData = async () => {
     try {
+      if (!rpcUrl) return
+
       // PancakeSwap V2 Factory address on BSC
       const factoryAddress = "0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73"
 
-      const response = await fetch(rpcUrl!, {
+      const response = await fetch(rpcUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -75,6 +155,77 @@ export function MainDexComponent() {
     } catch (error) {
       console.error("Error fetching factory data:", error)
     }
+  }
+
+  useEffect(() => {
+    if (rpcUrl) {
+      fetchFactoryData()
+    }
+  }, [rpcUrl])
+
+  const connectWallet = async () => {
+    setIsConnecting(true)
+    setError(null)
+
+    try {
+      if (typeof window !== "undefined" && window.ethereum) {
+        const accounts = await window.ethereum.request({
+          method: "eth_requestAccounts",
+        })
+
+        if (accounts.length > 0) {
+          setAccount(accounts[0])
+          setIsConnected(true)
+
+          const chainId = await window.ethereum.request({ method: "eth_chainId" })
+          setChainId(chainId)
+
+          // Switch to BSC if not already on it
+          if (chainId !== "0x38") {
+            try {
+              await window.ethereum.request({
+                method: "wallet_switchEthereumChain",
+                params: [{ chainId: "0x38" }],
+              })
+            } catch (switchError: any) {
+              // If BSC is not added, add it
+              if (switchError.code === 4902) {
+                await window.ethereum.request({
+                  method: "wallet_addEthereumChain",
+                  params: [
+                    {
+                      chainId: "0x38",
+                      chainName: "BNB Smart Chain",
+                      nativeCurrency: {
+                        name: "BNB",
+                        symbol: "BNB",
+                        decimals: 18,
+                      },
+                      rpcUrls: ["https://bsc-dataseed1.binance.org/"],
+                      blockExplorerUrls: ["https://bscscan.com/"],
+                    },
+                  ],
+                })
+              }
+            }
+          }
+        }
+      } else {
+        setError("MetaMask is not installed. Please install MetaMask to continue.")
+      }
+    } catch (error: any) {
+      console.error("Error connecting wallet:", error)
+      setError(error.message || "Failed to connect wallet")
+    } finally {
+      setIsConnecting(false)
+    }
+  }
+
+  const disconnectWallet = () => {
+    setIsConnected(false)
+    setAccount(null)
+    setChainId(null)
+    setError(null)
   }
 
   const getNetworkName = (chainId: string) => {
@@ -138,68 +289,6 @@ export function MainDexComponent() {
 
             <p className="text-cyan-200 text-xl font-medium">Connect your MetaMask wallet and perform test swaps.</p>
           </div>
-
-          {/* Wallet Detection Status */}
-          <Card className="bg-gradient-to-r from-blue-500/20 to-indigo-600/20 backdrop-blur-xl border-2 border-blue-400/30 p-6 shadow-2xl">
-            <div className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Activity className="w-5 h-5 text-blue-400" />
-                <h3 className="text-white font-bold text-lg">Wallet Detection</h3>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 text-sm">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-300">Browser Wallet:</span>
-                  <div className="flex items-center space-x-2">
-                    {isWalletDetected ? (
-                      <>
-                        <CheckCircle className="w-4 h-4 text-green-400" />
-                        <span className="text-green-400 font-bold">Detected</span>
-                      </>
-                    ) : (
-                      <>
-                        <AlertCircle className="w-4 h-4 text-red-400" />
-                        <span className="text-red-400 font-bold">Not Found</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-300">MetaMask Extension:</span>
-                  <div className="flex items-center space-x-2">
-                    {isMetaMaskInstalled ? (
-                      <>
-                        <CheckCircle className="w-4 h-4 text-green-400" />
-                        <span className="text-green-400 font-bold">Ready</span>
-                      </>
-                    ) : (
-                      <>
-                        <AlertCircle className="w-4 h-4 text-orange-400" />
-                        <span className="text-orange-400 font-bold">Install Needed</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {!isWalletDetected && (
-                <div className="mt-4 p-4 bg-orange-500/20 rounded-lg border border-orange-400/30">
-                  <p className="text-orange-300 text-sm font-medium mb-3">
-                    No wallet detected. Please install MetaMask extension:
-                  </p>
-                  <Button
-                    onClick={() => window.open("https://metamask.io/download/", "_blank")}
-                    className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 rounded-lg"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Install MetaMask
-                    <ExternalLink className="w-4 h-4 ml-2" />
-                  </Button>
-                </div>
-              )}
-            </div>
-          </Card>
 
           {/* Connection Status Card - SMOKE TEST HEALTH CHECK */}
           <Card className="bg-gradient-to-r from-green-500/20 to-emerald-600/20 backdrop-blur-xl border-2 border-green-400/30 p-6 shadow-2xl">
@@ -293,11 +382,11 @@ export function MainDexComponent() {
           {!isConnected ? (
             <Button
               onClick={connectWallet}
-              disabled={isConnecting || !isWalletDetected}
-              className="w-full bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 hover:from-yellow-500 hover:via-orange-600 hover:to-red-600 text-black font-black py-8 text-xl rounded-3xl shadow-2xl hover:shadow-yellow-400/50 transition-all duration-300 transform hover:scale-105 border-2 border-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isConnecting}
+              className="w-full bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 hover:from-yellow-500 hover:via-orange-600 hover:to-red-600 text-black font-black py-8 text-xl rounded-3xl shadow-2xl hover:shadow-yellow-400/50 transition-all duration-300 transform hover:scale-105 border-2 border-yellow-400"
             >
               <Shield className="w-8 h-8 mr-4" />
-              {isConnecting ? "Connecting..." : isWalletDetected ? "Connect Wallet" : "Install MetaMask First"}
+              {isConnecting ? "Connecting..." : "Connect MetaMask"}
               <Zap className="w-8 h-8 ml-4" />
             </Button>
           ) : (
@@ -330,7 +419,7 @@ export function MainDexComponent() {
             <div className="flex justify-center space-x-4 text-sm text-cyan-400 font-medium">
               <span>Powered by BSC</span>
               <span>•</span>
-              <span>Works with Any Browser</span>
+              <span>Secured by MetaMask</span>
               <span>•</span>
               <span>Built with ❤️</span>
             </div>

@@ -29,7 +29,7 @@ export function LoadingScreen() {
       </div>
 
       <div className="relative z-10 flex flex-col items-center space-y-12">
-        {/* Enhanced Kito Bears Logo - Much Larger and Round */}
+        {/* Enhanced Kito Bears Logo */}
         <div className="relative group">
           <div className="absolute -inset-8 bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 rounded-full blur-3xl opacity-40 group-hover:opacity-60 transition-opacity duration-500 animate-pulse"></div>
           <div className="relative">
@@ -40,17 +40,16 @@ export function LoadingScreen() {
                 className="w-full h-full object-cover rounded-full shadow-2xl transform hover:scale-105 transition-transform duration-500"
               />
             </div>
-            {/* Glowing Ring Effect */}
             <div className="absolute inset-0 rounded-full border-4 border-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 animate-spin-slow opacity-50"></div>
           </div>
         </div>
 
-        {/* Enhanced Title with Vibrant Colors */}
+        {/* Enhanced Title */}
         <div className="text-center space-y-6">
           <h1 className="text-7xl font-black bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent animate-pulse drop-shadow-2xl">
-            KitoSwap Dex
+            KitoSwap DEX v27
           </h1>
-          <p className="text-2xl text-cyan-200 font-medium animate-bounce">KitoConnect loading your awesome DEX...</p>
+          <p className="text-2xl text-cyan-200 font-medium animate-bounce">Loading advanced trading platform...</p>
         </div>
 
         {/* Enhanced Progress Bar */}
@@ -66,20 +65,24 @@ export function LoadingScreen() {
           <div className="text-center text-cyan-300 text-lg font-bold">{progress}% Complete</div>
         </div>
 
-        {/* Floating Particles */}
-        <div className="absolute inset-0 pointer-events-none">
-          {[...Array(30)].map((_, i) => (
-            <div
-              key={i}
-              className="absolute w-2 h-2 bg-cyan-400/40 rounded-full animate-float"
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                animationDelay: `${Math.random() * 3}s`,
-                animationDuration: `${3 + Math.random() * 2}s`,
-              }}
-            ></div>
-          ))}
+        {/* Feature Loading Indicators */}
+        <div className="grid grid-cols-2 gap-4 text-center">
+          <div className="text-cyan-300 text-sm">
+            <div className="w-2 h-2 bg-cyan-400 rounded-full mx-auto mb-2 animate-pulse"></div>
+            QuidaxClient
+          </div>
+          <div className="text-purple-300 text-sm">
+            <div className="w-2 h-2 bg-purple-400 rounded-full mx-auto mb-2 animate-pulse"></div>
+            RevEth Engine
+          </div>
+          <div className="text-blue-300 text-sm">
+            <div className="w-2 h-2 bg-blue-400 rounded-full mx-auto mb-2 animate-pulse"></div>
+            Live Charts
+          </div>
+          <div className="text-green-300 text-sm">
+            <div className="w-2 h-2 bg-green-400 rounded-full mx-auto mb-2 animate-pulse"></div>
+            Wallet Integration
+          </div>
         </div>
       </div>
     </div>
